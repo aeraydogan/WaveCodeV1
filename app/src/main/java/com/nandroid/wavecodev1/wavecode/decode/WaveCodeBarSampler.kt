@@ -1,7 +1,10 @@
 package com.nandroid.wavecodev1.wavecode.decode
 
+import android.util.Log
 import com.nandroid.wavecodev1.wavecode.WaveCodeSpec
 import kotlin.math.abs
+
+private const val TAG = "WaveCodeBarSampler"
 
 /**
  * Sampled heights and decoded buckets for the 34 core bars.
@@ -89,23 +92,27 @@ object WaveCodeBarSampler {
             confidences[i]   = conf
         }
 
+        Log.d(TAG, "sample: yScan=[$yMin,$yMax] usableH=${region.usableHeight.toInt()} " +
+                "bucketString=${buckets.joinToString("")} " +
+                "heightRatios=[${heightRatios.joinToString(",") { "%.2f".format(it) }}]")
+
         return SampledBars(buckets, heightRatios, confidences)
     }
 
     /**
-     * Vertical extent of dark pixels in a single column, bounded to [yMin, yMax].
-     * Bounding prevents background pixels far from the WaveCode from inflating bar heights.
+     * Longest contiguous vertical run of dark pixels in a single column, bounded to [yMin, yMax].
+     * Using the longest run (not the top→bottom extent) makes the height robust to stray dark
+     * pixels far from the bar (ink bleed, shadow) that would otherwise inflate the measurement.
      * Returns 0 if no ink pixels are found within the bounds.
      */
     private fun columnBarHeight(image: ProcessedImage, x: Int, yMin: Int, yMax: Int): Float {
-        var top = -1; var bot = -1
+        var best = 0; var cur = 0
         for (y in yMin..yMax) {
             if (image.pixels[y * image.width + x] < image.binaryThreshold) {
-                if (top == -1) top = y
-                bot = y
-            }
+                cur++; if (cur > best) best = cur
+            } else cur = 0
         }
-        return if (top != -1 && bot >= top) (bot - top + 1).toFloat() else 0f
+        return best.toFloat()
     }
 
     /**

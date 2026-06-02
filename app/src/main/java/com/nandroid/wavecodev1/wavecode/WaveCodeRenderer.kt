@@ -56,6 +56,8 @@ fun WaveCodeRenderer(
     variant: WaveCodeVisualVariant = WaveCodeVisualVariant.CalmMinimal,
     visualOverrides: Map<Int, Int> = emptyMap(),
     onBarTap: ((barIndex: Int) -> Unit)? = null,
+    drawBackground: Boolean = true,
+    barColor: Color = Color.Black,
     modifier: Modifier = Modifier
 ) {
     val groups = data.bits.chunked(WaveCodeSpec.BITS_PER_BAR)  // 34 groups
@@ -120,8 +122,11 @@ fun WaveCodeRenderer(
         val lvl0H = usableHeight * WaveCodeSpec.heightForLevel(0, variant)
         val lvl1H = usableHeight * WaveCodeSpec.heightForLevel(1, variant)
 
-        // White background
-        drawRect(color = Color.White, topLeft = Offset.Zero, size = size)
+        // Background — opaque white for product/preview; skipped in transparent (try-on) mode
+        // so the WaveCode can be overlaid on a photo as ink-only bars.
+        if (drawBackground) {
+            drawRect(color = Color.White, topLeft = Offset.Zero, size = size)
+        }
 
         // ── Start decorative edge markers: [level 0, level 0, level 1] outer → inner ────────────
         val startHeights = floatArrayOf(lvl0H, lvl0H, lvl1H)
@@ -130,7 +135,7 @@ fun WaveCodeRenderer(
             val barLeft  = slotLeft + (markerSlotWidth - markerBarWidth) / 2f
             val mh       = startHeights[i]
             drawRoundRect(
-                color        = Color.Black,
+                color        = barColor,
                 topLeft      = Offset(barLeft, centerY - mh / 2f),
                 size         = Size(markerBarWidth, mh),
                 cornerRadius = markerCornerRadius
@@ -145,7 +150,7 @@ fun WaveCodeRenderer(
             val barLeft  = slotLeft + (markerSlotWidth - markerBarWidth) / 2f
             val mh       = endHeights[i]
             drawRoundRect(
-                color        = Color.Black,
+                color        = barColor,
                 topLeft      = Offset(barLeft, centerY - mh / 2f),
                 size         = Size(markerBarWidth, mh),
                 cornerRadius = markerCornerRadius
@@ -158,7 +163,7 @@ fun WaveCodeRenderer(
             val slotLeft  = coreStartX + index * coreSlotWidth
             val barLeft   = slotLeft + (coreSlotWidth - coreBarWidth) / 2f
             drawRoundRect(
-                color        = Color.Black,
+                color        = barColor,
                 topLeft      = Offset(barLeft, centerY - barHeight / 2f),
                 size         = Size(coreBarWidth, barHeight),
                 cornerRadius = coreCornerRadius

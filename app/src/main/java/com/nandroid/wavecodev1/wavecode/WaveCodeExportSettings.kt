@@ -1,6 +1,19 @@
 package com.nandroid.wavecodev1.wavecode
 
 /**
+ * Background fill used when exporting a WaveCode PNG.
+ *
+ * [White] is the production default (max contrast). [Skin] simulates black ink on skin so the
+ * decoder can be tested against a non-white, lower-contrast background without printing —
+ * closer to the real tattoo use case. Decoder uses a relative (Otsu) threshold, so as long as
+ * the bars stay clearly darker than the background, both should decode.
+ */
+enum class WaveCodeExportBackground(val displayName: String, val color: Int) {
+    White("White",     0xFFFFFFFF.toInt()),
+    Skin ("Skin tone", 0xFFE8C4A0.toInt())
+}
+
+/**
  * Describes the physical and pixel dimensions for a WaveCode PNG export.
  *
  * [exportPixelWidth] is set per-preset to a quality floor (not derived from dpi alone),

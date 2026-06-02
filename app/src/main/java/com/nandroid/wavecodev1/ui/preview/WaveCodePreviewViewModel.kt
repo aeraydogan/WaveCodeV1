@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nandroid.wavecodev1.wavecode.WaveCodeData
 import com.nandroid.wavecodev1.wavecode.WaveCodeEncoder
+import com.nandroid.wavecodev1.wavecode.WaveCodeExportBackground
 import com.nandroid.wavecodev1.wavecode.WaveCodeExportSettings
 import com.nandroid.wavecodev1.wavecode.WaveCodeImageExporter
 import com.nandroid.wavecodev1.wavecode.WaveCodeSpec
@@ -52,6 +53,9 @@ class WaveCodePreviewViewModel : ViewModel() {
     private val _exportSettings = MutableStateFlow(WaveCodeExportSettings.DEFAULT)
     val exportSettings: StateFlow<WaveCodeExportSettings> = _exportSettings.asStateFlow()
 
+    private val _exportBackground = MutableStateFlow(WaveCodeExportBackground.White)
+    val exportBackground: StateFlow<WaveCodeExportBackground> = _exportBackground.asStateFlow()
+
     private val _exportState = MutableStateFlow<WaveCodeExportState>(WaveCodeExportState.Idle)
     val exportState: StateFlow<WaveCodeExportState> = _exportState.asStateFlow()
 
@@ -72,6 +76,10 @@ class WaveCodePreviewViewModel : ViewModel() {
 
     fun onExportPresetSelect(preset: WaveCodeExportSettings) {
         _exportSettings.value = preset
+    }
+
+    fun onExportBackgroundSelect(background: WaveCodeExportBackground) {
+        _exportBackground.value = background
     }
 
     fun toggleEditMode() {
@@ -126,10 +134,11 @@ class WaveCodePreviewViewModel : ViewModel() {
             val result = withContext(Dispatchers.IO) {
                 try {
                     val bitmap = WaveCodeImageExporter.exportToBitmap(
-                        data      = data,
-                        variant   = _selectedVariant.value,
-                        overrides = _visualOverrides.value,
-                        settings  = _exportSettings.value
+                        data       = data,
+                        variant    = _selectedVariant.value,
+                        overrides  = _visualOverrides.value,
+                        settings   = _exportSettings.value,
+                        background = _exportBackground.value
                     )
                     WaveCodeImageExporter.savePng(
                         context    = context.applicationContext,

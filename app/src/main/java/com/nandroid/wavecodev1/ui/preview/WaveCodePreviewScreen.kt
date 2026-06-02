@@ -25,6 +25,9 @@ import com.nandroid.wavecodev1.wavecode.WaveCodeVisualVariant
 @Composable
 fun WaveCodePreviewScreen(
     onNavigateToDecode: () -> Unit = {},
+    onNavigateToCreate: () -> Unit = {},
+    onNavigateToListen: () -> Unit = {},
+    onNavigateToTryOn: (WaveCodeData, WaveCodeVisualVariant, Map<Int, Int>) -> Unit = { _, _, _ -> },
     vm: WaveCodePreviewViewModel = viewModel()
 ) {
     val context         = LocalContext.current
@@ -35,6 +38,7 @@ fun WaveCodePreviewScreen(
     val visualOverrides by vm.visualOverrides.collectAsState()
     val editMode        by vm.editMode.collectAsState()
     val exportSettings  by vm.exportSettings.collectAsState()
+    val exportBackground by vm.exportBackground.collectAsState()
     val exportState     by vm.exportState.collectAsState()
 
     Column(
@@ -57,13 +61,31 @@ fun WaveCodePreviewScreen(
                 fontSize   = 22.sp,
                 fontFamily = FontFamily.Monospace
             )
-            TextButton(onClick = onNavigateToDecode) {
-                Text(
-                    text       = "Decode →",
-                    color      = Color(0xFF888888),
-                    fontSize   = 13.sp,
-                    fontFamily = FontFamily.Monospace
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onNavigateToCreate) {
+                    Text(
+                        text       = "Create →",
+                        color      = Color(0xFF888888),
+                        fontSize   = 13.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                TextButton(onClick = onNavigateToListen) {
+                    Text(
+                        text       = "Listen →",
+                        color      = Color(0xFF888888),
+                        fontSize   = 13.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                TextButton(onClick = onNavigateToDecode) {
+                    Text(
+                        text       = "Decode →",
+                        color      = Color(0xFF888888),
+                        fontSize   = 13.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
             }
         }
 
@@ -152,6 +174,19 @@ fun WaveCodePreviewScreen(
                 onBarTap        = if (editMode) vm::onBarTap else null
             )
 
+            // Tattoo placement preview (Try-On)
+            TextButton(
+                onClick  = { onNavigateToTryOn(waveCodeData!!, selectedVariant, visualOverrides) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text       = "Preview on skin →",
+                    color      = Color(0xFFAAAAAA),
+                    fontSize   = 13.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
             // Reset button — only shown when there are active overrides
             if (visualOverrides.isNotEmpty()) {
                 Row(
@@ -170,10 +205,12 @@ fun WaveCodePreviewScreen(
             }
 
             WaveCodeExportPanel(
-                selectedSettings = exportSettings,
-                onPresetSelect   = vm::onExportPresetSelect,
-                exportState      = exportState,
-                onExportClick    = { vm.exportPng(context) }
+                selectedSettings   = exportSettings,
+                onPresetSelect     = vm::onExportPresetSelect,
+                selectedBackground = exportBackground,
+                onBackgroundSelect = vm::onExportBackgroundSelect,
+                exportState        = exportState,
+                onExportClick      = { vm.exportPng(context) }
             )
 
             DebugPanel(

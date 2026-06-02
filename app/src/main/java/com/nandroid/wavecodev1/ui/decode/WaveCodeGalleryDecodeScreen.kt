@@ -137,7 +137,16 @@ fun WaveCodeGalleryDecodeScreen(
         // ── Result ───────────────────────────────────────────────────────────────────────────────
         uiState.result?.let { result ->
             when (result) {
-                is WaveCodeDecodeResult.Success -> SuccessCard(result)
+                is WaveCodeDecodeResult.Success -> {
+                    SuccessCard(result)
+                    ResolveCard(
+                        status    = uiState.resolveStatus,
+                        title     = uiState.resolvedEntry?.title,
+                        isPlaying = uiState.isPlaying,
+                        onPlay    = vm::playResolved,
+                        onStop    = vm::stopPlayback
+                    )
+                }
                 is WaveCodeDecodeResult.Failure -> FailureCard(result)
             }
             DebugInfoCard(
@@ -178,6 +187,70 @@ private fun SuccessCard(result: WaveCodeDecodeResult.Success) {
             fontSize   = 11.sp,
             fontFamily = FontFamily.Monospace
         )
+    }
+}
+
+@Composable
+private fun ResolveCard(
+    status: ResolveStatus,
+    title: String?,
+    isPlaying: Boolean,
+    onPlay: () -> Unit,
+    onStop: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF14141A), RoundedCornerShape(8.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        when (status) {
+            ResolveStatus.Found -> {
+                Text("Matched audio", color = Color(0xFF88AACC), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                Text(
+                    text       = title ?: "(untitled)",
+                    color      = Color.White,
+                    fontSize   = 16.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Button(
+                    onClick  = if (isPlaying) onStop else onPlay,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors   = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor   = Color.Black
+                    )
+                ) {
+                    Text(
+                        text       = if (isPlaying) "■ Stop" else "▶ Play",
+                        fontSize   = 13.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+            ResolveStatus.NotInLibrary -> {
+                Text("No saved audio", color = Color(0xFFFFAA44), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                Text(
+                    text       = "This code is valid but not in your library on this device.",
+                    color      = Color(0xFF888888),
+                    fontSize   = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    lineHeight = 15.sp
+                )
+            }
+            ResolveStatus.AudioMissing -> {
+                Text("Audio file missing", color = Color(0xFFFF6060), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                Text(
+                    text       = "Mapping found (${title ?: "untitled"}) but the audio file is gone.",
+                    color      = Color(0xFF888888),
+                    fontSize   = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    lineHeight = 15.sp
+                )
+            }
+            ResolveStatus.NotResolved -> {}
+        }
     }
 }
 

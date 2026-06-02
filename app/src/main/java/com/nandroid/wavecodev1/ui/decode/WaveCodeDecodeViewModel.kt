@@ -7,11 +7,15 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nandroid.wavecodev1.audio.AudioPlayer
+import com.nandroid.wavecodev1.data.WaveCodeEntry
+import com.nandroid.wavecodev1.data.WaveCodeLibraryRepository
 import com.nandroid.wavecodev1.wavecode.decode.DecodeDebugInfo
 import com.nandroid.wavecodev1.wavecode.decode.FailureReason
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeBitParser
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeDecodeResult
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeDecoder
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,17 +26,25 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "WaveCodeDecodeVM"
 
+/** Outcome of resolving a decoded publicCode against the local library. */
+enum class ResolveStatus { NotResolved, Found, NotInLibrary, AudioMissing }
+
 data class DecodeUiState(
     val isDecoding: Boolean = false,
     val result: WaveCodeDecodeResult? = null,
     val previewBitmap: Bitmap? = null,
-    val selfTestPassed: Boolean? = null  // null = not yet run
+    val selfTestPassed: Boolean? = null,  // null = not yet run
+    val resolveStatus: ResolveStatus = ResolveStatus.NotResolved,
+    val resolvedEntry: WaveCodeEntry? = null,
+    val isPlaying: Boolean = false
 )
 
 class WaveCodeDecodeViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(DecodeUiState())
     val uiState: StateFlow<DecodeUiState> = _uiState.asStateFlow()
+
+    private val player = AudioPlayer()
 
     init {
         // Run self-test on init to verify the bit parser is consistent with the encoder.
@@ -46,10 +58,20 @@ class WaveCodeDecodeViewModel : ViewModel() {
 
     fun loadAndDecode(context: Context, uri: Uri) {
         if (_uiState.value.isDecoding) return
-        _uiState.update { it.copy(isDecoding = true, result = null, previewBitmap = null) }
+        player.stop()
+        _uiState.update {
+            it.copy(
+                isDecoding = true,
+                result = null,
+                previewBitmap = null,
+                resolveStatus = ResolveStatus.NotResolved,
+                resolvedEntry = null,
+                isPlaying = false
+            )
+        }
 
         viewModelScope.launch {
-            val (preview, result) = withContext(Dispatchers.IO) {
+            val outcome = withContext(Dispatchers.IO) {
                 try {
                     val appCtx = context.applicationContext
 
@@ -59,36 +81,85 @@ class WaveCodeDecodeViewModel : ViewModel() {
                     // Load full-resolution bitmap for decoding.
                     val full = loadFullBitmap(appCtx, uri)
                     if (full == null) {
-                        return@withContext Pair(
+                        return@withContext DecodeOutcome(
                             preview,
-                            WaveCodeDecodeResult.Failure(
-                                FailureReason.UnsupportedImage,
-                                DecodeDebugInfo()
-                            )
+                            WaveCodeDecodeResult.Failure(FailureReason.UnsupportedImage, DecodeDebugInfo())
                         )
                     }
 
                     val decodeResult = WaveCodeDecoder.decode(full)
                     full.recycle()
-                    Pair(preview, decodeResult)
+
+                    // Resolve a successful publicCode against the local library.
+                    var status = ResolveStatus.NotResolved
+                    var entry: WaveCodeEntry? = null
+                    if (decodeResult is WaveCodeDecodeResult.Success) {
+                        val found = WaveCodeLibraryRepository.get(appCtx).findByCode(decodeResult.publicCode)
+                        when {
+                            found == null -> status = ResolveStatus.NotInLibrary
+                            !File(found.audioPath).exists() -> { status = ResolveStatus.AudioMissing; entry = found }
+                            else -> { status = ResolveStatus.Found; entry = found }
+                        }
+                        Log.d(TAG, "resolve: code=${decodeResult.publicCode} status=$status")
+                    }
+                    DecodeOutcome(preview, decodeResult, status, entry)
                 } catch (e: Exception) {
                     Log.e(TAG, "loadAndDecode failed", e)
-                    Pair(
+                    DecodeOutcome(
                         null,
-                        WaveCodeDecodeResult.Failure(
-                            FailureReason.Unknown,
-                            DecodeDebugInfo()
-                        )
+                        WaveCodeDecodeResult.Failure(FailureReason.Unknown, DecodeDebugInfo())
                     )
                 }
             }
 
-            _uiState.update { it.copy(isDecoding = false, result = result, previewBitmap = preview) }
+            _uiState.update {
+                it.copy(
+                    isDecoding = false,
+                    result = outcome.result,
+                    previewBitmap = outcome.preview,
+                    resolveStatus = outcome.status,
+                    resolvedEntry = outcome.entry
+                )
+            }
         }
     }
 
+    /** Plays the resolved audio, if any. */
+    fun playResolved() {
+        val entry = _uiState.value.resolvedEntry ?: return
+        val ok = player.play(entry.audioPath) {
+            _uiState.update { it.copy(isPlaying = false) }
+        }
+        _uiState.update { it.copy(isPlaying = ok) }
+    }
+
+    fun stopPlayback() {
+        player.stop()
+        _uiState.update { it.copy(isPlaying = false) }
+    }
+
+    private data class DecodeOutcome(
+        val preview: Bitmap?,
+        val result: WaveCodeDecodeResult,
+        val status: ResolveStatus = ResolveStatus.NotResolved,
+        val entry: WaveCodeEntry? = null
+    )
+
     fun clearResult() {
-        _uiState.update { it.copy(result = null, previewBitmap = null) }
+        player.stop()
+        _uiState.update {
+            it.copy(
+                result = null,
+                previewBitmap = null,
+                resolveStatus = ResolveStatus.NotResolved,
+                resolvedEntry = null,
+                isPlaying = false
+            )
+        }
+    }
+
+    override fun onCleared() {
+        player.release()
     }
 
     // ── Bitmap loading helpers ────────────────────────────────────────────────────────────────────

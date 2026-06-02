@@ -218,6 +218,14 @@ object WaveCodeRegionDetector {
         val centerY = computeCenterY(image, segments)
         val (usableHeight, confidence) = calibrateAndScore(image, segments)
 
+        // Sanity: marker calibration must not exceed the image height. A usableHeight far larger
+        // than the image means the marker bars were mis-measured — reject so other thresholds /
+        // orientations get a chance instead of sampling garbage (all-zero buckets → FormatMismatch).
+        if (usableHeight > image.height * 1.1f) {
+            Log.d(TAG, "buildRegion: rejecting — usableHeight=${usableHeight.toInt()} > imageH=${image.height}")
+            return null
+        }
+
         val xRangeDesc = if (xRange.first == 0 && xRange.last == image.width - 1) "full"
                          else "crop[${xRange.first},${xRange.last}]"
 
@@ -304,31 +312,47 @@ object WaveCodeRegionDetector {
 
     private fun computeCenterY(image: ProcessedImage, segments: List<IntRange>): Float {
         val centers = segments.map { xRange ->
-            var topY = image.height; var botY = -1
+            val cs = ArrayList<Float>(xRange.last - xRange.first + 1)
             for (x in xRange) {
-                for (y in 0 until image.height) {
-                    if (image.pixels[y * image.width + x] < image.binaryThreshold) {
-                        if (y < topY) topY = y
-                        if (y > botY) botY = y
-                    }
-                }
+                val run = columnLongestDarkRun(image, x)
+                if (run.length > 0) cs.add(run.center)
             }
-            if (botY >= topY) (topY + botY) / 2.0f else image.height / 2.0f
+            if (cs.isEmpty()) image.height / 2.0f else { cs.sort(); cs[cs.size / 2] }
         }
         return centers.average().toFloat()
     }
 
+    /**
+     * Robust per-bar pixel height: the median across the segment's columns of each column's
+     * longest contiguous dark run. Replaces the previous top→bottom extent, which inflated to
+     * near-full image height when a column contained stray dark pixels (card edge / shadow)
+     * far from the actual bar — the root cause of impossible usableHeight values on photos.
+     */
     private fun barPixelHeight(image: ProcessedImage, xRange: IntRange): Int {
-        var topY = image.height; var botY = -1
+        val runs = ArrayList<Int>(xRange.last - xRange.first + 1)
         for (x in xRange) {
-            for (y in 0 until image.height) {
-                if (image.pixels[y * image.width + x] < image.binaryThreshold) {
-                    if (y < topY) topY = y
-                    if (y > botY) botY = y
-                }
-            }
+            val run = columnLongestDarkRun(image, x)
+            if (run.length > 0) runs.add(run.length)
         }
-        return if (botY >= topY) botY - topY + 1 else 0
+        if (runs.isEmpty()) return 0
+        runs.sort()
+        return runs[runs.size / 2]
+    }
+
+    /** Longest contiguous vertical run of dark pixels in column [x], with its center y. */
+    private data class DarkRun(val length: Int, val center: Float)
+
+    private fun columnLongestDarkRun(image: ProcessedImage, x: Int): DarkRun {
+        var best = 0; var bestStart = -1
+        var cur = 0; var curStart = -1
+        for (y in 0 until image.height) {
+            if (image.pixels[y * image.width + x] < image.binaryThreshold) {
+                if (cur == 0) curStart = y
+                cur++
+                if (cur > best) { best = cur; bestStart = curStart }
+            } else cur = 0
+        }
+        return if (best > 0) DarkRun(best, bestStart + best / 2.0f) else DarkRun(0, -1f)
     }
 
     /**
@@ -366,6 +390,10 @@ object WaveCodeRegionDetector {
         val outerErr   = abs(outerRatio - OUTER_MARKER_RATIO) / OUTER_MARKER_RATIO
         val innerErr   = abs(innerRatio - INNER_MARKER_RATIO) / INNER_MARKER_RATIO
         val confidence = ((1f - outerErr) * 0.5f + (1f - innerErr) * 0.5f).coerceIn(0f, 1f)
+
+        Log.d(TAG, "calibrate: avgOuter=${avgOuter.toInt()} avgInner=${avgInner.toInt()} " +
+                "usableFromOuter=${usableFromOuter.toInt()} usableFromInner=${usableFromInner.toInt()} " +
+                "usableHeight=${usableHeight.toInt()} imageH=${image.height} conf=${"%.2f".format(confidence)}")
 
         return Pair(usableHeight, confidence)
     }

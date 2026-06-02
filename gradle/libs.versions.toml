@@ -11,6 +11,8 @@ composeBom = "2024.09.03"
 activityCompose = "1.9.2"
 lifecycleViewmodel = "2.8.6"
 camerax = "1.3.4"
+okhttp = "4.12.0"
+media3 = "1.4.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -31,6 +33,8 @@ camerax-core     = { group = "androidx.camera", name = "camera-core",     versio
 camerax-camera2  = { group = "androidx.camera", name = "camera-camera2",  version.ref = "camerax" }
 camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 camerax-view     = { group = "androidx.camera", name = "camera-view",     version.ref = "camerax" }
+okhttp           = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

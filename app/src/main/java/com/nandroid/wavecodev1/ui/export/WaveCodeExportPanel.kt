@@ -12,17 +12,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nandroid.wavecodev1.ui.preview.WaveCodeExportState
+import com.nandroid.wavecodev1.wavecode.WaveCodeExportBackground
 import com.nandroid.wavecodev1.wavecode.WaveCodeExportSettings
 
 @Composable
 fun WaveCodeExportPanel(
     selectedSettings: WaveCodeExportSettings,
     onPresetSelect: (WaveCodeExportSettings) -> Unit,
+    selectedBackground: WaveCodeExportBackground,
+    onBackgroundSelect: (WaveCodeExportBackground) -> Unit,
     exportState: WaveCodeExportState,
     onExportClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -66,6 +70,48 @@ fun WaveCodeExportPanel(
             fontSize   = 11.sp,
             fontFamily = FontFamily.Monospace
         )
+
+        HorizontalDivider(
+            color    = Color(0xFF2A2A2A),
+            modifier = Modifier.padding(vertical = 6.dp)
+        )
+
+        // Background selector (White = production, Skin tone = non-white decode test)
+        Text(
+            text       = "Background",
+            color      = Color(0xFF666666),
+            fontSize   = 11.sp,
+            fontFamily = FontFamily.Monospace
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            WaveCodeExportBackground.entries.forEach { bg ->
+                val isSelected = bg == selectedBackground
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isSelected) Color(0xFF2E2E2E) else Color.Transparent)
+                        .clickable { onBackgroundSelect(bg) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(14.dp)
+                            .background(Color(bg.color), CircleShape)
+                    )
+                    Text(
+                        text       = bg.displayName,
+                        color      = if (isSelected) Color.White else Color(0xFF888888),
+                        fontSize   = 12.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
 
         // Reliability warning for small physical sizes
         if (selectedSettings.physicalWidthCm < 5f) {

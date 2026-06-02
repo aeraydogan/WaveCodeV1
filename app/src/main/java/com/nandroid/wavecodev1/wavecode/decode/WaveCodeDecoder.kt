@@ -118,7 +118,12 @@ object WaveCodeDecoder {
                     }
                     is WaveCodeDecodeResult.Failure -> {
                         Log.d(TAG, "decode: parse failed orientation=$orientDeg roi=${candidate.type} " +
-                                "reason=${parsed.reason}")
+                                "reason=${parsed.reason} " +
+                                "start=${parsed.debugInfo.startMarkerValid} " +
+                                "version=${parsed.debugInfo.versionValid} " +
+                                "end=${parsed.debugInfo.endMarkerValid} " +
+                                "checksum=${parsed.debugInfo.checksumValid} " +
+                                "rawBits=${parsed.debugInfo.rawBits}")
                         val f = parsed.copy(
                             debugInfo = parsed.debugInfo.copy(
                                 detectedRegionDescription = region.debugDescription,

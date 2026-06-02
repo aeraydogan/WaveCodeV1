@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Temp photos captured for the Try-On placement preview.
+         Lives in the app cache so it is cleaned up automatically. -->
+    <cache-path
+        name="tryon_photos"
+        path="tryon_photos/" />
+</paths>

@@ -57,6 +57,11 @@ dependencies {
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
 
+    // Backend integration: OkHttp for multipart upload + metadata GET (JSON parsed via org.json).
+    implementation(libs.okhttp)
+    // Media3 ExoPlayer for streaming audio playback from the backend URL.
+    implementation(libs.media3.exoplayer)
+
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)

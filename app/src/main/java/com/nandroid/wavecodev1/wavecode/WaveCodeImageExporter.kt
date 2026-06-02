@@ -49,7 +49,8 @@ object WaveCodeImageExporter {
         data: WaveCodeData,
         variant: WaveCodeVisualVariant,
         overrides: Map<Int, Int>,
-        settings: WaveCodeExportSettings
+        settings: WaveCodeExportSettings,
+        background: WaveCodeExportBackground = WaveCodeExportBackground.White
     ): Bitmap {
         val w      = settings.exportPixelWidth
         val h      = settings.exportPixelHeight
@@ -89,8 +90,8 @@ object WaveCodeImageExporter {
         val lvl1H = usableHeight * WaveCodeSpec.heightForLevel(1, variant)
         // ─────────────────────────────────────────────────────────────────────────────────────────
 
-        // White background
-        paint.color = Color.WHITE
+        // Background (White for production, Skin tone for non-white decode testing)
+        paint.color = background.color
         canvas.drawRect(0f, 0f, canvasW, canvasH, paint)
 
         paint.color = Color.BLACK
