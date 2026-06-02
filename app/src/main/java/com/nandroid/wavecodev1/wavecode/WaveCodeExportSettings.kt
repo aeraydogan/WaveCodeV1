@@ -1,0 +1,56 @@
+package com.nandroid.wavecodev1.wavecode
+
+/**
+ * Describes the physical and pixel dimensions for a WaveCode PNG export.
+ *
+ * [exportPixelWidth] is set per-preset to a quality floor (not derived from dpi alone),
+ * ensuring the 34 core bars have enough pixels to survive tattoo-ink spread and camera scan.
+ * [exportPixelHeight] is derived from [exportPixelWidth] / [aspectRatio].
+ *
+ * DECODER NOTE: the export geometry scales the same visual-level logic as the renderer.
+ * A wider export just adds more pixels per bar — it does not change decode bucket mapping.
+ */
+data class WaveCodeExportSettings(
+    val presetName: String,
+    val physicalWidthCm: Float,
+    val aspectRatio: Float,       // e.g. 3f means width is 3× height
+    val dpi: Int,
+    val exportPixelWidth: Int
+) {
+    val exportPixelHeight: Int = (exportPixelWidth / aspectRatio).toInt()
+
+    companion object {
+        val PRESETS: List<WaveCodeExportSettings> = listOf(
+            WaveCodeExportSettings(
+                presetName      = "Small Tattoo",
+                physicalWidthCm = 4f,
+                aspectRatio     = 3f,
+                dpi             = 300,
+                exportPixelWidth = 1536
+            ),
+            WaveCodeExportSettings(
+                presetName      = "Medium Tattoo",
+                physicalWidthCm = 6f,
+                aspectRatio     = 3f,
+                dpi             = 300,
+                exportPixelWidth = 2048
+            ),
+            WaveCodeExportSettings(
+                presetName      = "Large Tattoo",
+                physicalWidthCm = 8f,
+                aspectRatio     = 3f,
+                dpi             = 300,
+                exportPixelWidth = 2560
+            ),
+            WaveCodeExportSettings(
+                presetName      = "Stencil High Quality",
+                physicalWidthCm = 10f,
+                aspectRatio     = 3f,
+                dpi             = 300,
+                exportPixelWidth = 4096
+            )
+        )
+
+        val DEFAULT: WaveCodeExportSettings = PRESETS[1]  // Medium Tattoo
+    }
+}
