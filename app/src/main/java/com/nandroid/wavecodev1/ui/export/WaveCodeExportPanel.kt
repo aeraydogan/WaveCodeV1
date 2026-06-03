@@ -85,7 +85,10 @@ fun WaveCodeExportPanel(
         )
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            WaveCodeExportBackground.entries.forEach { bg ->
+            // Transparent is overlay-only (tattoo try-on); not a user-facing export background.
+            WaveCodeExportBackground.entries
+                .filter { it != WaveCodeExportBackground.Transparent }
+                .forEach { bg ->
                 val isSelected = bg == selectedBackground
                 Row(
                     modifier = Modifier

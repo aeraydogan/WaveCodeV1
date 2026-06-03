@@ -10,7 +10,10 @@ package com.nandroid.wavecodev1.wavecode
  */
 enum class WaveCodeExportBackground(val displayName: String, val color: Int) {
     White("White",     0xFFFFFFFF.toInt()),
-    Skin ("Skin tone", 0xFFE8C4A0.toInt())
+    Skin ("Skin tone", 0xFFE8C4A0.toInt()),
+    // Fully transparent — used for the tattoo try-on overlay (ink-only bars over a photo).
+    // Excluded from the export-panel background picker.
+    Transparent("Transparent", 0x00000000)
 }
 
 /**

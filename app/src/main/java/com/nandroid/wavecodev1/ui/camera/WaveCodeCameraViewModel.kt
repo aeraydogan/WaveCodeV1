@@ -1,5 +1,6 @@
 package com.nandroid.wavecodev1.ui.camera
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -9,6 +10,9 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nandroid.wavecodev1.audio.WaveCodeAudioController
+import com.nandroid.wavecodev1.net.VoiceCodeMetadata
+import com.nandroid.wavecodev1.net.WaveCodeNetworkResult
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeDecodeResult
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeDecoder
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +30,16 @@ data class CameraScanUiState(
     val isDecoding: Boolean = false,
     val croppedPreviewBitmap: Bitmap? = null,
     val result: WaveCodeDecodeResult? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    // Resolve + playback (after a successful decode)
+    val isResolving: Boolean = false,
+    val resolved: Boolean = false,
+    val title: String? = null,
+    val durationLabel: String? = null,
+    val resolveError: String? = null,
+    val isPlaying: Boolean = false,
+    val isBuffering: Boolean = false,
+    val playbackError: String? = null
 )
 
 class WaveCodeCameraViewModel : ViewModel() {
@@ -36,6 +49,14 @@ class WaveCodeCameraViewModel : ViewModel() {
 
     private var imageCapture: ImageCapture? = null
     private val captureExecutor = Executors.newSingleThreadExecutor()
+
+    // Resolve + streaming playback reuse the same shared controller as the other listen screens.
+    private val audio = WaveCodeAudioController().apply {
+        onPlayingChanged   = { playing -> _uiState.update { it.copy(isPlaying = playing) } }
+        onBufferingChanged = { buffering -> _uiState.update { it.copy(isBuffering = buffering) } }
+        onError            = { _uiState.update { it.copy(isPlaying = false, isBuffering = false, playbackError = "Kayıt oynatılamadı.") } }
+    }
+    private var resolvedMeta: VoiceCodeMetadata? = null
 
     fun onImageCaptureReady(capture: ImageCapture) {
         imageCapture = capture
@@ -112,19 +133,87 @@ class WaveCodeCameraViewModel : ViewModel() {
         val result = WaveCodeDecoder.decode(croppedBitmap)
         Log.d(TAG, "decode result: ${result::class.simpleName}")
         _uiState.update { it.copy(isDecoding = false, result = result) }
+
+        // On a successful decode, resolve the code against the backend (same logic as the
+        // gallery / manual-code listen flows).
+        if (result is WaveCodeDecodeResult.Success) resolve(result.publicCode)
+    }
+
+    /** Resolves the decoded publicCode to metadata via the backend. */
+    private fun resolve(publicCode: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isResolving = true, resolved = false, resolveError = null, playbackError = null) }
+            when (val r = audio.resolve(publicCode)) {
+                is WaveCodeNetworkResult.Success -> {
+                    resolvedMeta = r.data
+                    _uiState.update {
+                        it.copy(
+                            isResolving = false,
+                            resolved = true,
+                            title = r.data.title,
+                            durationLabel = formatDuration(r.data.durationMs)
+                        )
+                    }
+                }
+                is WaveCodeNetworkResult.Failure -> {
+                    Log.w(TAG, "resolve failure: kind=${r.kind} http=${r.httpCode}")
+                    _uiState.update { it.copy(isResolving = false, resolved = false, resolveError = resolveErrorMessage(r)) }
+                }
+            }
+        }
+    }
+
+    /** Oynat — starts (or resumes) playback. */
+    fun play(context: Context) {
+        val meta = resolvedMeta ?: return
+        _uiState.update { it.copy(playbackError = null) }
+        audio.start(context.applicationContext, meta)
+    }
+
+    /** Tekrar Oynat — restarts playback from the beginning. */
+    fun replay(context: Context) {
+        val meta = resolvedMeta ?: return
+        _uiState.update { it.copy(playbackError = null) }
+        audio.restart(context.applicationContext, meta)
     }
 
     fun clearResult() {
+        audio.stop()
+        resolvedMeta = null
         _uiState.update { it.copy(
             result = null,
             croppedPreviewBitmap = null,
-            errorMessage = null
+            errorMessage = null,
+            isResolving = false,
+            resolved = false,
+            title = null,
+            durationLabel = null,
+            resolveError = null,
+            isPlaying = false,
+            isBuffering = false,
+            playbackError = null
         )}
     }
 
     override fun onCleared() {
         super.onCleared()
+        audio.release()
         captureExecutor.shutdown()
+    }
+
+    private fun resolveErrorMessage(failure: WaveCodeNetworkResult.Failure): String = when (failure.kind) {
+        WaveCodeNetworkResult.Kind.NotFound -> "Bu koda ait ses bulunamadı."
+        WaveCodeNetworkResult.Kind.Network -> "Sunucuya ulaşılamadı."
+        WaveCodeNetworkResult.Kind.Timeout -> "İstek zaman aşımına uğradı. Tekrar deneyin."
+        WaveCodeNetworkResult.Kind.Server -> "Sunucu hatası. Daha sonra tekrar deneyin."
+        WaveCodeNetworkResult.Kind.Malformed -> "Sunucudan beklenmeyen bir yanıt geldi."
+        else -> "Kod çözümlenemedi. Tekrar deneyin."
+    }
+
+    private fun formatDuration(durationMs: Long?): String? {
+        if (durationMs == null || durationMs <= 0) return null
+        val totalSeconds = durationMs / 1000
+        return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
     }
 
     companion object {

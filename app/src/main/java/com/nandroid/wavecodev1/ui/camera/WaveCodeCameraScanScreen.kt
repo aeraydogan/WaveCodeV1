@@ -33,9 +33,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.nandroid.wavecodev1.wavecode.decode.ConfidenceLevel
-import com.nandroid.wavecodev1.wavecode.decode.DecodeDebugInfo
-import com.nandroid.wavecodev1.wavecode.decode.FailureReason
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeDecodeResult
 
 // Guide frame geometry constants (match WaveCodeCameraViewModel.cropToGuideFrame)
@@ -156,7 +153,13 @@ fun WaveCodeCameraScanScreen(
 
             // ── Result overlay ─────────────────────────────────────────────────────────────────────
             if (uiState.result != null || uiState.errorMessage != null) {
-                CameraScanResultOverlay(uiState = uiState, onScanAgain = vm::clearResult)
+                CameraScanResultOverlay(
+                    uiState     = uiState,
+                    onScanAgain = vm::clearResult,
+                    onBack      = onNavigateBack,
+                    onPlay      = { vm.play(context) },
+                    onReplay    = { vm.replay(context) }
+                )
             }
         }
 
@@ -262,7 +265,10 @@ private fun CameraPermissionScreen(onRequestPermission: () -> Unit) {
 @Composable
 private fun CameraScanResultOverlay(
     uiState: CameraScanUiState,
-    onScanAgain: () -> Unit
+    onScanAgain: () -> Unit,
+    onBack: () -> Unit,
+    onPlay: () -> Unit,
+    onReplay: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -275,43 +281,127 @@ private fun CameraScanResultOverlay(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 48.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Cropped bitmap preview — confirms crop region visually
+            // Captured image, displayed prominently near the top.
             uiState.croppedPreviewBitmap?.let { bmp ->
-                CroppedBitmapPreview(bmp)
+                CapturedImagePreview(bmp)
             }
 
-            uiState.errorMessage?.let { msg ->
-                Text(msg, color = Color(0xFFFF6060), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-            }
+            // Capture / image-read error (no decode result at all).
+            uiState.errorMessage?.let { msg -> ResultErrorText(msg) }
 
-            uiState.result?.let { result ->
-                when (result) {
-                    is WaveCodeDecodeResult.Success -> CameraSuccessCard(result)
-                    is WaveCodeDecodeResult.Failure -> CameraFailureCard(result)
-                }
-                CameraDebugCard(
-                    info = when (result) {
-                        is WaveCodeDecodeResult.Success -> result.debugInfo
-                        is WaveCodeDecodeResult.Failure -> result.debugInfo
+            when (val result = uiState.result) {
+                is WaveCodeDecodeResult.Success -> {
+                    // ── Decoded code ────────────────────────────────────────
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF161616), RoundedCornerShape(10.dp))
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Ses Kodu", color = Color(0xFF888888), fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                        Text(
+                            text       = result.publicCode,
+                            color      = Color.White,
+                            fontSize   = 28.sp,
+                            fontFamily = FontFamily.Monospace,
+                            textAlign  = TextAlign.Center,
+                            modifier   = Modifier.fillMaxWidth()
+                        )
                     }
-                )
-            }
 
-            Button(
-                onClick  = onScanAgain,
-                modifier = Modifier.fillMaxWidth(),
-                colors   = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
-            ) {
-                Text("Tekrar Tara", fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+                    // ── Resolve state ───────────────────────────────────────
+                    if (uiState.isResolving) ResultStatusRow("Ses bulunuyor...")
+                    uiState.resolveError?.let { ResultErrorText(it) }
+
+                    // ── Metadata + playback ─────────────────────────────────
+                    if (uiState.resolved) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF0D2B0D), RoundedCornerShape(10.dp))
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            uiState.title?.takeIf { it.isNotBlank() }?.let {
+                                Text(it, color = Color.White, fontSize = 16.sp, textAlign = TextAlign.Center)
+                            }
+                            uiState.durationLabel?.let {
+                                Text(it, color = Color(0xFF9DBF9D), fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+                            }
+                            uiState.playbackError?.let { ResultErrorText(it) }
+                            if (uiState.isBuffering) ResultStatusRow("Yükleniyor…")
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick  = onPlay,
+                                    modifier = Modifier.weight(1f),
+                                    colors   = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                                ) {
+                                    Text(if (uiState.isPlaying) "Oynatılıyor" else "Oynat", fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+                                }
+                                Button(
+                                    onClick  = onReplay,
+                                    modifier = Modifier.weight(1f),
+                                    colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A), contentColor = Color.White)
+                                ) {
+                                    Text("Tekrar Oynat", fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick  = onScanAgain,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A), contentColor = Color.White)
+                    ) {
+                        Text("Tekrar Tara", fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+                    }
+                }
+
+                is WaveCodeDecodeResult.Failure -> {
+                    ResultErrorText("WaveCode okunamadı.")
+                    ResultActionRow(onScanAgain = onScanAgain, onBack = onBack)
+                }
+
+                null -> {
+                    // Only a capture/image error was set.
+                    ResultActionRow(onScanAgain = onScanAgain, onBack = onBack)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun CroppedBitmapPreview(bmp: Bitmap) {
+private fun ResultActionRow(onScanAgain: () -> Unit, onBack: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick  = onScanAgain,
+            modifier = Modifier.weight(1f),
+            colors   = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+        ) {
+            Text("Tekrar Tara", fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+        }
+        Button(
+            onClick  = onBack,
+            modifier = Modifier.weight(1f),
+            colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A), contentColor = Color.White)
+        ) {
+            Text("Geri", fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun CapturedImagePreview(bmp: Bitmap) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -320,104 +410,36 @@ private fun CroppedBitmapPreview(bmp: Bitmap) {
     ) {
         Image(
             painter            = BitmapPainter(bmp.asImageBitmap()),
-            contentDescription = "Kırpılmış WaveCode bölgesi",
+            contentDescription = "Çekilen WaveCode görseli",
             contentScale       = ContentScale.Fit,
             modifier           = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 140.dp)
+                .heightIn(max = 200.dp)
         )
     }
 }
 
 @Composable
-private fun CameraSuccessCard(result: WaveCodeDecodeResult.Success) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF0D2B0D), RoundedCornerShape(8.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+private fun ResultStatusRow(message: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("Çözümleme başarılı", color = Color(0xFF88BB88), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-        Text(
-            text       = result.publicCode,
-            color      = Color.White,
-            fontSize   = 28.sp,
-            fontFamily = FontFamily.Monospace,
-            textAlign  = TextAlign.Center,
-            modifier   = Modifier.fillMaxWidth()
-        )
-        val confColor = if (result.confidenceLevel == ConfidenceLevel.High) Color(0xFF88BB88) else Color(0xFFFFAA44)
-        Text(
-            text       = "Güven: ${result.confidenceLevel.name.lowercase()}  " +
-                    "(${"%.0f".format(result.confidence * 100)} %)",
-            color      = confColor,
-            fontSize   = 11.sp,
-            fontFamily = FontFamily.Monospace
-        )
+        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+        Spacer(Modifier.width(10.dp))
+        Text(message, color = Color(0xFFBBBBBB), fontSize = 13.sp, fontFamily = FontFamily.Monospace)
     }
 }
 
 @Composable
-private fun CameraFailureCard(result: WaveCodeDecodeResult.Failure) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF2B0D0D), RoundedCornerShape(8.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text("Çözümleme başarısız", color = Color(0xFFFF6060), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-        Text(result.reason.name, color = Color(0xFFFF9999), fontSize = 16.sp, fontFamily = FontFamily.Monospace)
-        val hint = when (result.reason) {
-            FailureReason.NotFound       -> "WaveCode yapısı bulunamadı. Çerçeveyi yatay hizalayın."
-            FailureReason.FormatMismatch -> "Başlangıç/bitiş işaretleri veya sürüm uyuşmuyor."
-            FailureReason.ChecksumError  -> "WaveCode algılandı ancak sağlama toplamı hatalı. Görüntü bozuk olabilir."
-            FailureReason.RegionError    -> "İşaret grupları algılandı ancak çekirdek bölge kurulamadı."
-            else                         -> "Beklenmeyen hata."
-        }
-        Text(hint, color = Color(0xFF888888), fontSize = 11.sp, fontFamily = FontFamily.Monospace, lineHeight = 15.sp)
-    }
-}
-
-@Composable
-private fun CameraDebugCard(info: DecodeDebugInfo) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF1A1A1A), RoundedCornerShape(8.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text("Hata ayıklama", color = Color(0xFF555555), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-        Spacer(Modifier.height(2.dp))
-        DbgRow("rotation",  if (info.appliedRotationDeg != 0) "${info.appliedRotationDeg}°" else "0° (no rotation)")
-        DbgRow("roi type",   info.roiType.ifEmpty { "—" })
-        DbgRow("roi bounds", info.roiBounds.ifEmpty { "—" })
-        DbgRow("candidates", if (info.candidateCount > 0) "${info.candidateCount}" else "—")
-        DbgRow("attempts",   "${info.totalAttempts}")
-        DbgRow("threshold",  "${info.appliedThreshold}")
-        DbgRow("preprocess", info.preprocessMode.ifEmpty { "—" })
-        DbgRow("median conf", if (info.medianBarConfidence > 0f) "${"%.2f".format(info.medianBarConfidence)}" else "—")
-        DbgRow("start marker", if (info.startMarkerValid) "valid" else "invalid")
-        DbgRow("version",      if (info.versionValid)     "valid" else "invalid")
-        DbgRow("end marker",   if (info.endMarkerValid)   "valid" else "invalid")
-        DbgRow("checksum",     if (info.checksumValid)    "valid" else "invalid")
-        if (info.detectedRegionDescription.isNotEmpty()) {
-            HorizontalDivider(color = Color(0xFF2A2A2A), modifier = Modifier.padding(vertical = 2.dp))
-            Text(info.detectedRegionDescription, color = Color(0xFF444444), fontSize = 9.sp, fontFamily = FontFamily.Monospace, lineHeight = 13.sp)
-        }
-        if (info.bucketString.isNotEmpty()) {
-            HorizontalDivider(color = Color(0xFF2A2A2A), modifier = Modifier.padding(vertical = 2.dp))
-            Text("buckets: ${info.bucketString}", color = Color(0xFF3A3A3A), fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-        }
-    }
-}
-
-@Composable
-private fun DbgRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = Color(0xFF555555), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-        Text(value, color = Color(0xFF888888), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-    }
+private fun ResultErrorText(message: String) {
+    Text(
+        text       = message,
+        color      = Color(0xFFFF6060),
+        fontSize   = 13.sp,
+        fontFamily = FontFamily.Monospace,
+        textAlign  = TextAlign.Center,
+        modifier   = Modifier.fillMaxWidth()
+    )
 }
