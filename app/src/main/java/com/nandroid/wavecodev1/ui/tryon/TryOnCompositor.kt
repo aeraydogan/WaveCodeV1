@@ -2,14 +2,12 @@ package com.nandroid.wavecodev1.ui.tryon
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
-import android.media.ExifInterface
 import android.net.Uri
 import androidx.core.content.FileProvider
+import com.nandroid.wavecodev1.util.BitmapLoader
 import java.io.File
 import java.io.FileOutputStream
 
@@ -50,8 +48,8 @@ fun composeTryOn(
     photoRotationDeg: Int = 0
 ): Bitmap? {
     if (canvasW <= 0 || canvasH <= 0) return null
-    val photo = loadTryOnPhotoBitmap(context, photoUri, maxOf(canvasW, canvasH))
-        ?.let { rotateBitmap(it, photoRotationDeg) } ?: return null
+    val photo = BitmapLoader.loadDownsampled(context, photoUri, maxOf(canvasW, canvasH))
+        ?.let { BitmapLoader.rotate(it, photoRotationDeg) } ?: return null
 
     val out = Bitmap.createBitmap(canvasW, canvasH, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(out)
@@ -93,47 +91,4 @@ fun writeShareImage(context: Context, bitmap: Bitmap): Uri? = try {
     FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 } catch (e: Exception) {
     null
-}
-
-/** Rotates [src] by [degrees] (0/90/180/270). Returns [src] unchanged when degrees is 0. */
-fun rotateBitmap(src: Bitmap, degrees: Int): Bitmap {
-    val norm = ((degrees % 360) + 360) % 360
-    if (norm == 0) return src
-    val matrix = Matrix().apply { postRotate(norm.toFloat()) }
-    return Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
-}
-
-/**
- * Loads a display-sized (≤ [maxDim] px) Android Bitmap from [uri], or null on failure.
- *
- * Applies the photo's EXIF orientation so portrait photos (whose raw pixels are landscape with a
- * "rotate" tag) are shown upright instead of sideways.
- */
-fun loadTryOnPhotoBitmap(context: Context, uri: Uri, maxDim: Int = 1600): Bitmap? = try {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-    val largest = maxOf(bounds.outWidth, bounds.outHeight).coerceAtLeast(1)
-    val cap = maxDim.coerceAtLeast(1)
-    var sample = 1
-    while (largest / sample > cap) sample *= 2
-    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-    val decoded = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
-    decoded?.let { rotateBitmap(it, exifRotationDegrees(context, uri)) }
-} catch (e: Exception) {
-    null
-}
-
-/** Reads the EXIF orientation of [uri] and returns the clockwise degrees needed to display upright. */
-private fun exifRotationDegrees(context: Context, uri: Uri): Int = try {
-    context.contentResolver.openInputStream(uri)?.use { input ->
-        val exif = ExifInterface(input)
-        when (exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-            ExifInterface.ORIENTATION_ROTATE_90  -> 90
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270
-            else -> 0
-        }
-    } ?: 0
-} catch (e: Exception) {
-    0
 }

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nandroid.wavecodev1.util.BitmapLoader
 import com.nandroid.wavecodev1.wavecode.WaveCodeData
 import com.nandroid.wavecodev1.wavecode.WaveCodeExportBackground
 import com.nandroid.wavecodev1.wavecode.WaveCodeExportSettings
@@ -142,8 +143,8 @@ fun WaveCodeTryOnScreen(
             // ── Photo + overlay area — full photo fit between the bars ──────
             val photoBitmap by produceState<ImageBitmap?>(initialValue = null, photoUri, uiState.photoRotationDeg) {
                 value = withContext(Dispatchers.IO) {
-                    loadTryOnPhotoBitmap(context, photoUri)
-                        ?.let { rotateBitmap(it, uiState.photoRotationDeg) }
+                    BitmapLoader.loadDownsampled(context, photoUri)
+                        ?.let { BitmapLoader.rotate(it, uiState.photoRotationDeg) }
                         ?.asImageBitmap()
                 }
             }

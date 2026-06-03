@@ -11,6 +11,7 @@ import com.nandroid.wavecodev1.data.WaveCodeEntry
 import com.nandroid.wavecodev1.data.WaveCodeLibraryRepository
 import com.nandroid.wavecodev1.net.WaveCodeNetworkResult
 import com.nandroid.wavecodev1.net.WaveCodeRemoteRepository
+import com.nandroid.wavecodev1.util.NetworkErrorMessages
 import com.nandroid.wavecodev1.wavecode.WaveCodeData
 import com.nandroid.wavecodev1.wavecode.WaveCodeEncoder
 import com.nandroid.wavecodev1.wavecode.WaveCodeExportBackground
@@ -162,7 +163,7 @@ class WaveCodeTattooCreateViewModel : ViewModel() {
             is WaveCodeNetworkResult.Success -> upload.data
             is WaveCodeNetworkResult.Failure -> {
                 Log.w(TAG, "upload failed: kind=${upload.kind} http=${upload.httpCode} detail=${upload.detail}")
-                return UploadOutcome.Err(uploadErrorMessage(upload))
+                return UploadOutcome.Err(NetworkErrorMessages.upload(upload.kind))
             }
         }
         val code = metadata.publicCode
@@ -228,19 +229,6 @@ class WaveCodeTattooCreateViewModel : ViewModel() {
         } finally {
             try { retriever.release() } catch (_: Exception) {}
         }
-    }
-
-    private fun uploadErrorMessage(failure: WaveCodeNetworkResult.Failure): String = when (failure.kind) {
-        WaveCodeNetworkResult.Kind.Network ->
-            "Sunucuya ulaşılamadı. Telefon ve bilgisayarın aynı Wi-Fi ağında olduğundan emin olun."
-        WaveCodeNetworkResult.Kind.Timeout -> "Yükleme zaman aşımına uğradı. Tekrar deneyin."
-        WaveCodeNetworkResult.Kind.TooLarge -> "Ses dosyası çok büyük."
-        WaveCodeNetworkResult.Kind.UnsupportedMedia -> "Bu ses biçimi desteklenmiyor."
-        WaveCodeNetworkResult.Kind.BadRequest -> "Geçersiz istek. Ses dosyasını kontrol edin."
-        WaveCodeNetworkResult.Kind.Server -> "Sunucu hatası. Daha sonra tekrar deneyin."
-        WaveCodeNetworkResult.Kind.Malformed -> "Sunucudan beklenmeyen bir yanıt geldi."
-        WaveCodeNetworkResult.Kind.NotFound -> "Yükleme başarısız oldu."
-        WaveCodeNetworkResult.Kind.Unknown -> "Yükleme başarısız oldu."
     }
 
     override fun onCleared() {

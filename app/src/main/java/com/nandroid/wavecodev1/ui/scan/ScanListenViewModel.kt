@@ -1,14 +1,15 @@
 package com.nandroid.wavecodev1.ui.scan
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nandroid.wavecodev1.audio.WaveCodeAudioController
 import com.nandroid.wavecodev1.net.WaveCodeNetworkResult
+import com.nandroid.wavecodev1.util.BitmapLoader
+import com.nandroid.wavecodev1.util.NetworkErrorMessages
+import com.nandroid.wavecodev1.util.formatDuration
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeDecodeResult
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeDecoder
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +62,7 @@ class ScanListenViewModel : ViewModel() {
 
         viewModelScope.launch {
             val decoded = withContext(Dispatchers.IO) {
-                val bitmap = loadFullBitmap(appContext, uri)
+                val bitmap = BitmapLoader.loadFull(appContext, uri)
                     ?: return@withContext null
                 val result = WaveCodeDecoder.decode(bitmap)
                 bitmap.recycle()
@@ -107,7 +108,7 @@ class ScanListenViewModel : ViewModel() {
                 }
                 is WaveCodeNetworkResult.Failure -> {
                     Log.w(TAG, "resolve failure: kind=${result.kind} http=${result.httpCode}")
-                    _uiState.update { it.copy(isResolving = false, resolved = false, resolveError = resolveErrorMessage(result)) }
+                    _uiState.update { it.copy(isResolving = false, resolved = false, resolveError = NetworkErrorMessages.resolve(result.kind)) }
                 }
             }
         }
@@ -123,28 +124,5 @@ class ScanListenViewModel : ViewModel() {
 
     override fun onCleared() {
         audio.release()
-    }
-
-    private fun loadFullBitmap(context: Context, uri: Uri): Bitmap? = try {
-        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
-    } catch (e: Exception) {
-        Log.e(TAG, "loadFullBitmap failed", e); null
-    }
-
-    private fun resolveErrorMessage(failure: WaveCodeNetworkResult.Failure): String = when (failure.kind) {
-        WaveCodeNetworkResult.Kind.NotFound -> "Bu koda ait ses bulunamadı."
-        WaveCodeNetworkResult.Kind.Network -> "Sunucuya ulaşılamadı. İnternet bağlantını kontrol et."
-        WaveCodeNetworkResult.Kind.Timeout -> "İstek zaman aşımına uğradı. Tekrar deneyin."
-        WaveCodeNetworkResult.Kind.Server -> "Sunucu hatası. Daha sonra tekrar deneyin."
-        WaveCodeNetworkResult.Kind.Malformed -> "Sunucudan beklenmeyen bir yanıt geldi."
-        else -> "Kod çözümlenemedi. Tekrar deneyin."
-    }
-
-    private fun formatDuration(durationMs: Long?): String? {
-        if (durationMs == null || durationMs <= 0) return null
-        val totalSeconds = durationMs / 1000
-        val minutes = totalSeconds / 60
-        val seconds = totalSeconds % 60
-        return "%d:%02d".format(minutes, seconds)
     }
 }

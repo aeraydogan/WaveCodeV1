@@ -13,6 +13,8 @@ import androidx.lifecycle.viewModelScope
 import com.nandroid.wavecodev1.audio.WaveCodeAudioController
 import com.nandroid.wavecodev1.net.VoiceCodeMetadata
 import com.nandroid.wavecodev1.net.WaveCodeNetworkResult
+import com.nandroid.wavecodev1.util.NetworkErrorMessages
+import com.nandroid.wavecodev1.util.formatDuration
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeDecodeResult
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeDecoder
 import kotlinx.coroutines.Dispatchers
@@ -157,7 +159,7 @@ class WaveCodeCameraViewModel : ViewModel() {
                 }
                 is WaveCodeNetworkResult.Failure -> {
                     Log.w(TAG, "resolve failure: kind=${r.kind} http=${r.httpCode}")
-                    _uiState.update { it.copy(isResolving = false, resolved = false, resolveError = resolveErrorMessage(r)) }
+                    _uiState.update { it.copy(isResolving = false, resolved = false, resolveError = NetworkErrorMessages.resolve(r.kind)) }
                 }
             }
         }
@@ -199,21 +201,6 @@ class WaveCodeCameraViewModel : ViewModel() {
         super.onCleared()
         audio.release()
         captureExecutor.shutdown()
-    }
-
-    private fun resolveErrorMessage(failure: WaveCodeNetworkResult.Failure): String = when (failure.kind) {
-        WaveCodeNetworkResult.Kind.NotFound -> "Bu koda ait ses bulunamadı."
-        WaveCodeNetworkResult.Kind.Network -> "Sunucuya ulaşılamadı."
-        WaveCodeNetworkResult.Kind.Timeout -> "İstek zaman aşımına uğradı. Tekrar deneyin."
-        WaveCodeNetworkResult.Kind.Server -> "Sunucu hatası. Daha sonra tekrar deneyin."
-        WaveCodeNetworkResult.Kind.Malformed -> "Sunucudan beklenmeyen bir yanıt geldi."
-        else -> "Kod çözümlenemedi. Tekrar deneyin."
-    }
-
-    private fun formatDuration(durationMs: Long?): String? {
-        if (durationMs == null || durationMs <= 0) return null
-        val totalSeconds = durationMs / 1000
-        return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
     }
 
     companion object {
