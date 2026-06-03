@@ -1,5 +1,6 @@
 package com.nandroid.wavecodev1
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -8,19 +9,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import com.nandroid.wavecodev1.ui.camera.WaveCodeCameraScanScreen
-import com.nandroid.wavecodev1.ui.create.WaveCodeCreateScreen
 import com.nandroid.wavecodev1.ui.create.WaveCodeTattooCreateScreen
-import com.nandroid.wavecodev1.ui.decode.WaveCodeGalleryDecodeScreen
 import com.nandroid.wavecodev1.ui.home.WaveCodeHomeScreen
-import com.nandroid.wavecodev1.ui.listen.ListenByCodeScreen
-import android.net.Uri
-import com.nandroid.wavecodev1.ui.preview.WaveCodePreviewScreen
 import com.nandroid.wavecodev1.ui.scan.ScanListenScreen
 import com.nandroid.wavecodev1.ui.tryon.WaveCodeTryOnScreen
 import com.nandroid.wavecodev1.wavecode.WaveCodeData
 import com.nandroid.wavecodev1.wavecode.WaveCodeVisualVariant
 
-private enum class AppScreen { Home, TattooCreate, ScanListen, Preview, Create, Decode, CameraScan, TryOn, Listen }
+private enum class AppScreen { Home, TattooCreate, ScanListen, CameraScan, TryOn }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,29 +60,7 @@ class MainActivity : ComponentActivity() {
                             navigateTo(AppScreen.TryOn)
                         }
                     )
-                    AppScreen.Preview -> WaveCodePreviewScreen(
-                        onNavigateToDecode = { navigateTo(AppScreen.Decode) },
-                        onNavigateToCreate = { navigateTo(AppScreen.Create) },
-                        onNavigateToListen = { navigateTo(AppScreen.Listen) },
-                        onNavigateToTryOn  = { data, variant, overrides ->
-                            tryOnData = data
-                            tryOnVariant = variant
-                            tryOnOverrides = overrides
-                            tryOnInitialPhoto = null
-                            navigateTo(AppScreen.TryOn)
-                        }
-                    )
-                    AppScreen.Create  -> WaveCodeCreateScreen(
-                        onNavigateBack = { goBack() }
-                    )
-                    AppScreen.Decode  -> WaveCodeGalleryDecodeScreen(
-                        onNavigateBack     = { goBack() },
-                        onNavigateToCamera = { navigateTo(AppScreen.CameraScan) }
-                    )
                     AppScreen.CameraScan -> WaveCodeCameraScanScreen(
-                        onNavigateBack = { goBack() }
-                    )
-                    AppScreen.Listen -> ListenByCodeScreen(
                         onNavigateBack = { goBack() }
                     )
                     AppScreen.TryOn -> {
