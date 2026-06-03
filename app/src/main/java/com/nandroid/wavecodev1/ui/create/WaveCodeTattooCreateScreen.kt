@@ -5,16 +5,21 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -25,6 +30,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nandroid.wavecodev1.ui.components.OutlineButton
+import com.nandroid.wavecodev1.ui.components.PrimaryButton
+import com.nandroid.wavecodev1.ui.components.TonalButton
+import com.nandroid.wavecodev1.ui.components.WaveCodeTopBar
+import com.nandroid.wavecodev1.ui.theme.WaveCodeColors
+import com.nandroid.wavecodev1.ui.theme.WaveCodeIcons
 import com.nandroid.wavecodev1.ui.tryon.createTryOnCaptureUri
 import com.nandroid.wavecodev1.wavecode.WaveCodeData
 import com.nandroid.wavecodev1.wavecode.WaveCodeExportBackground
@@ -66,11 +77,11 @@ fun WaveCodeTattooCreateScreen(
 
     val tryOnGalleryPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
-    ) { uri -> if (uri != null) openEditor(uri) }  // cancelled → uri null → stay on screen
+    ) { uri -> if (uri != null) openEditor(uri) }
 
     val tryOnCameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
-    ) { success -> pendingCaptureUri?.let { if (success) openEditor(it) } }  // cancelled → success false
+    ) { success -> pendingCaptureUri?.let { if (success) openEditor(it) } }
 
     var pendingTryOnCamera by remember { mutableStateOf(false) }
     val tryOnCameraPermission = rememberLauncherForActivityResult(
@@ -101,168 +112,108 @@ fun WaveCodeTattooCreateScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F0F))
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(WaveCodeColors.Canvas)
+            .statusBarsPadding()
     ) {
-        // ── Header ──────────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        WaveCodeTopBar(title = "Dövme Oluştur", onNavigateBack = onNavigateBack)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
+                .padding(top = 8.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            TextButton(onClick = onNavigateBack) {
-                Text("← Geri", color = Color(0xFF888888), fontSize = 13.sp)
-            }
-            Text("Dövme Oluştur", color = Color.White, fontSize = 18.sp)
-            Spacer(Modifier.width(56.dp))
-        }
-
-        // ── Title input ─────────────────────────────────────────────────────
-        OutlinedTextField(
-            value = uiState.title,
-            onValueChange = vm::onTitleChange,
-            label = { Text("Başlık", color = Color.Gray) },
-            placeholder = { Text("Bu ses için bir başlık gir", color = Color(0xFF666666)) },
-            singleLine = true,
-            enabled = !uiState.isUploading,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor     = Color.White,
-                unfocusedTextColor   = Color.White,
-                focusedBorderColor   = Color.White,
-                unfocusedBorderColor = Color.Gray,
-                cursorColor          = Color.White
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        // ── Record / stop ───────────────────────────────────────────────────
-        val isRecording = uiState.isRecording
-        Button(
-            onClick  = { if (isRecording) vm.stopRecording(context) else requestRecord() },
-            enabled  = !uiState.isUploading,
-            modifier = Modifier.fillMaxWidth().height(54.dp),
-            shape    = RoundedCornerShape(14.dp),
-            colors   = ButtonDefaults.buttonColors(
-                containerColor         = if (isRecording) Color(0xFFCC4444) else Color.White,
-                contentColor           = if (isRecording) Color.White else Color.Black,
-                disabledContainerColor = Color(0xFF2A2A2A),
-                disabledContentColor   = Color(0xFF777777)
+            // ── Title input ─────────────────────────────────────────────────
+            OutlinedTextField(
+                value = uiState.title,
+                onValueChange = vm::onTitleChange,
+                label = { Text("Başlık") },
+                placeholder = { Text("Bu ses için bir başlık gir", color = WaveCodeColors.TextMuted) },
+                singleLine = true,
+                enabled = !uiState.isUploading,
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor      = WaveCodeColors.TextPrimary,
+                    unfocusedTextColor    = WaveCodeColors.TextPrimary,
+                    focusedBorderColor    = WaveCodeColors.Accent,
+                    unfocusedBorderColor  = WaveCodeColors.Outline,
+                    focusedLabelColor     = WaveCodeColors.Accent,
+                    unfocusedLabelColor   = WaveCodeColors.TextSecondary,
+                    cursorColor           = WaveCodeColors.Accent
+                ),
+                modifier = Modifier.fillMaxWidth()
             )
-        ) {
-            Text(
-                text     = if (isRecording) "■ Kaydı Durdur" else "● Ses Kaydet",
-                fontSize = 16.sp
+
+            // ── Record / stop ───────────────────────────────────────────────
+            RecordControl(
+                isRecording = uiState.isRecording,
+                enabled = !uiState.isUploading,
+                onToggle = { if (uiState.isRecording) vm.stopRecording(context) else requestRecord() }
             )
-        }
 
-        // ── Uploading (saving audio + getting the code from the server) ─────
-        if (uiState.isUploading) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = Color.White
-                )
-                Spacer(Modifier.width(12.dp))
-                Text("Kaydediliyor…", color = Color(0xFFBBBBBB), fontSize = 14.sp)
+            // ── Uploading ───────────────────────────────────────────────────
+            if (uiState.isUploading) {
+                StatusRow("Kaydediliyor…")
             }
-        }
 
-        // ── Error + retry ───────────────────────────────────────────────────
-        uiState.error?.let { err ->
-            Text(err, color = Color(0xFFFF6060), fontSize = 12.sp, modifier = Modifier.fillMaxWidth())
-        }
-        if (uiState.canRetry && !uiState.isUploading) {
-            Button(
-                onClick  = { vm.retryUpload(context) },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape    = RoundedCornerShape(12.dp),
-                colors   = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor   = Color.Black
-                )
-            ) {
-                Text("Tekrar Dene", fontSize = 15.sp)
-            }
-        }
-
-        // ── Result: preview + code + actions (after the server returns a code) ─
-        val data = waveCodeData
-        if (uiState.previewReady && data != null) {
-
-            // Tabs: white vs skin-tone background
-            val selectedIndex = if (uiState.selectedBackground == PreviewBackground.White) 0 else 1
-            TabRow(
-                selectedTabIndex = selectedIndex,
-                containerColor   = Color(0xFF1A1A1A),
-                contentColor     = Color.White
-            ) {
-                Tab(
-                    selected = selectedIndex == 0,
-                    onClick  = { vm.selectBackground(PreviewBackground.White) },
-                    text     = { Text("Beyaz Zemin", fontSize = 13.sp) }
-                )
-                Tab(
-                    selected = selectedIndex == 1,
-                    onClick  = { vm.selectBackground(PreviewBackground.Skin) },
-                    text     = { Text("Ten Rengi Zemin", fontSize = 13.sp) }
+            // ── Error + retry ───────────────────────────────────────────────
+            uiState.error?.let { err -> FeedbackText(err, isError = true) }
+            if (uiState.canRetry && !uiState.isUploading) {
+                PrimaryButton(
+                    text = "Tekrar Dene",
+                    onClick = { vm.retryUpload(context) },
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = WaveCodeIcons.Replay
                 )
             }
 
-            // Preview card — background follows the selected tab.
-            val skinColor = Color(WaveCodeExportBackground.Skin.color)
-            val previewBg = if (uiState.selectedBackground == PreviewBackground.White) Color.White else skinColor
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color(0xFF2A2A2A), RoundedCornerShape(10.dp))
-                    .background(previewBg, RoundedCornerShape(10.dp))
-                    .padding(vertical = 16.dp, horizontal = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                // drawBackground = false so the tab background (white or skin) shows behind the bars.
-                WaveCodeRenderer(
-                    data           = data,
-                    variant        = WaveCodeVisualVariant.CalmMinimal,
-                    drawBackground = false,
-                    barColor       = Color.Black
+            // ── Result ──────────────────────────────────────────────────────
+            val data = waveCodeData
+            if (uiState.previewReady && data != null) {
+
+                SegmentedTabs(
+                    selectedSkin = uiState.selectedBackground == PreviewBackground.Skin,
+                    onSelect = { skin -> vm.selectBackground(if (skin) PreviewBackground.Skin else PreviewBackground.White) }
                 )
-            }
 
-            // ── Code display ("Ses Kodu") + copy ────────────────────────────
-            CodeCard(code = uiState.code)
+                val previewBg = if (uiState.selectedBackground == PreviewBackground.White)
+                    Color.White else Color(WaveCodeExportBackground.Skin.color)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(previewBg)
+                        .padding(vertical = 18.dp, horizontal = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    WaveCodeRenderer(
+                        data = data,
+                        variant = WaveCodeVisualVariant.CalmMinimal,
+                        drawBackground = false,
+                        barColor = Color.Black
+                    )
+                }
 
-            // ── Save image ──────────────────────────────────────────────────
-            Button(
-                onClick  = { vm.saveImage(context) },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape    = RoundedCornerShape(12.dp),
-                colors   = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2A2A2A),
-                    contentColor   = Color.White
+                CodeCard(code = uiState.code)
+
+                TonalButton(
+                    text = "Görseli Kaydet",
+                    onClick = { vm.saveImage(context) },
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = WaveCodeIcons.Download,
+                    height = 52
                 )
-            ) {
-                Text("Görseli Kaydet", fontSize = 15.sp)
-            }
-            uiState.imageFeedback?.let { FeedbackText(it) }
+                uiState.imageFeedback?.let { FeedbackText(it.message, isError = it.isError) }
 
-            Spacer(Modifier.height(4.dp))
-
-            // ── Bottom: tattoo try-on entry ─────────────────────────────────
-            OutlinedButton(
-                onClick  = { showTryOnSheet = true },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape    = RoundedCornerShape(12.dp),
-                colors   = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-            ) {
-                Text("Dövmeyi Teninde Gör", fontSize = 15.sp)
+                OutlineButton(
+                    text = "Dövmeyi Teninde Gör",
+                    onClick = { showTryOnSheet = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 52
+                )
             }
         }
     }
@@ -271,8 +222,8 @@ fun WaveCodeTattooCreateScreen(
     if (showTryOnSheet) {
         ModalBottomSheet(
             onDismissRequest = { showTryOnSheet = false },
-            sheetState       = sheetState,
-            containerColor   = Color(0xFF1A1A1A)
+            sheetState = sheetState,
+            containerColor = WaveCodeColors.Surface2
         ) {
             Column(
                 modifier = Modifier
@@ -281,25 +232,116 @@ fun WaveCodeTattooCreateScreen(
                     .padding(bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Fotoğraf seç", color = Color.White, fontSize = 16.sp)
-                Button(
-                    onClick  = { tryOnGalleryPicker.launch("image/*") },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape    = RoundedCornerShape(12.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
-                ) {
-                    Text("Galeriden Seç", fontSize = 15.sp)
-                }
-                Button(
-                    onClick  = { launchTryOnCamera() },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape    = RoundedCornerShape(12.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A), contentColor = Color.White)
-                ) {
-                    Text("Kamera Aç", fontSize = 15.sp)
+                Text("Fotoğraf seç", color = WaveCodeColors.TextPrimary, fontSize = 16.sp)
+                PrimaryButton(
+                    text = "Galeriden Seç",
+                    onClick = { tryOnGalleryPicker.launch("image/*") },
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = WaveCodeIcons.Gallery,
+                    height = 52
+                )
+                TonalButton(
+                    text = "Kamera Aç",
+                    onClick = { launchTryOnCamera() },
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = WaveCodeIcons.Camera,
+                    height = 52
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordControl(isRecording: Boolean, enabled: Boolean, onToggle: () -> Unit) {
+    val pulse = rememberInfiniteTransition(label = "pulse")
+    val scale by pulse.animateFloat(
+        initialValue = 1f, targetValue = 1.18f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "scale"
+    )
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(modifier = Modifier.size(128.dp), contentAlignment = Alignment.Center) {
+            if (isRecording) {
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .scale(scale)
+                        .clip(CircleShape)
+                        .background(WaveCodeColors.Recording.copy(alpha = 0.18f))
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(
+                        when {
+                            !enabled -> WaveCodeColors.Surface3
+                            isRecording -> WaveCodeColors.Recording
+                            else -> WaveCodeColors.Accent
+                        }
+                    )
+                    .clickable(enabled = enabled, onClick = onToggle),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isRecording) {
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(Color.White)
+                    )
+                } else {
+                    Icon(
+                        WaveCodeIcons.Mic, contentDescription = "Kaydet",
+                        tint = if (enabled) WaveCodeColors.OnAccent else WaveCodeColors.TextMuted,
+                        modifier = Modifier.size(36.dp)
+                    )
                 }
             }
         }
+        Text(
+            text = if (isRecording) "Kaydı Durdur" else "Ses Kaydet",
+            color = WaveCodeColors.TextPrimary,
+            fontSize = 16.sp
+        )
+    }
+}
+
+@Composable
+private fun SegmentedTabs(selectedSkin: Boolean, onSelect: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(WaveCodeColors.Surface1)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        SegOption("Beyaz Zemin", active = !selectedSkin, modifier = Modifier.weight(1f)) { onSelect(false) }
+        SegOption("Ten Rengi Zemin", active = selectedSkin, modifier = Modifier.weight(1f)) { onSelect(true) }
+    }
+}
+
+@Composable
+private fun SegOption(text: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(11.dp))
+            .background(if (active) WaveCodeColors.Surface3 else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            color = if (active) WaveCodeColors.TextPrimary else WaveCodeColors.TextSecondary,
+            fontSize = 13.sp
+        )
     }
 }
 
@@ -307,64 +349,64 @@ fun WaveCodeTattooCreateScreen(
 private fun CodeCard(code: String) {
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
-
-    // Reset the "Kopyalandı" success state after a short moment.
     LaunchedEffect(copied) {
-        if (copied) {
-            delay(1500)
-            copied = false
-        }
+        if (copied) { delay(1500); copied = false }
     }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF161616), RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(WaveCodeColors.Surface1)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Ses Kodu", color = Color(0xFF888888), fontSize = 12.sp)
+        Text("Ses Kodu", color = WaveCodeColors.TextSecondary, fontSize = 12.sp)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF0F0F0F), RoundedCornerShape(8.dp))
-                .border(1.dp, Color(0xFF333333), RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(WaveCodeColors.Canvas)
+                .border(1.dp, WaveCodeColors.Outline, RoundedCornerShape(12.dp))
                 .padding(vertical = 14.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text       = code,
-                color      = Color.White,
-                fontSize   = 30.sp,
+                text = code,
+                color = WaveCodeColors.TextPrimary,
+                fontSize = 30.sp,
                 fontFamily = FontFamily.Monospace,
-                textAlign  = TextAlign.Center
+                textAlign = TextAlign.Center
             )
         }
-        Button(
-            onClick  = {
-                clipboard.setText(AnnotatedString(code))
-                copied = true
-            },
-            modifier = Modifier.fillMaxWidth().height(46.dp),
-            shape    = RoundedCornerShape(10.dp),
-            colors   = ButtonDefaults.buttonColors(
-                containerColor = if (copied) Color(0xFF1E7E34) else Color(0xFF2A2A2A),
-                contentColor   = Color.White
-            )
-        ) {
-            Text(
-                text     = if (copied) "✓ Kopyalandı" else "Kopyala",
-                fontSize = 14.sp
-            )
-        }
+        TonalButton(
+            text = if (copied) "Kopyalandı" else "Kopyala",
+            onClick = { clipboard.setText(AnnotatedString(code)); copied = true },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = if (copied) WaveCodeIcons.Check else WaveCodeIcons.Copy,
+            height = 48
+        )
     }
 }
 
 @Composable
-private fun FeedbackText(feedback: TattooCreateUiState.Feedback) {
+private fun StatusRow(message: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = WaveCodeColors.Accent)
+        Spacer(Modifier.width(12.dp))
+        Text(message, color = WaveCodeColors.TextSecondary, fontSize = 14.sp)
+    }
+}
+
+@Composable
+private fun FeedbackText(message: String, isError: Boolean) {
     Text(
-        text     = feedback.message,
-        color    = if (feedback.isError) Color(0xFFFF6060) else Color(0xFF66BB6A),
+        text = message,
+        color = if (isError) WaveCodeColors.Error else WaveCodeColors.Success,
         fontSize = 12.sp,
         modifier = Modifier.fillMaxWidth()
     )
