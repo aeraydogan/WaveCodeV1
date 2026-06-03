@@ -6,8 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
+import com.nandroid.wavecodev1.ui.theme.WaveCodeTheme
 import com.nandroid.wavecodev1.ui.camera.WaveCodeCameraScanScreen
 import com.nandroid.wavecodev1.ui.create.WaveCodeTattooCreateScreen
 import com.nandroid.wavecodev1.ui.home.WaveCodeHomeScreen
@@ -23,7 +23,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme {
+            WaveCodeTheme {
                 // Simple navigation back stack — the top entry is the visible screen.
                 val backStack = remember { mutableStateListOf(AppScreen.Home) }
                 val screen = backStack.last()
