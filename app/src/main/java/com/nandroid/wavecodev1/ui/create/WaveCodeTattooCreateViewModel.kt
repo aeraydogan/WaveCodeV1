@@ -33,6 +33,7 @@ enum class PreviewBackground { White, Skin }
 data class TattooCreateUiState(
     val title: String = "",
     val isRecording: Boolean = false,
+    val recorded: Boolean = false,            // audio is staged, awaiting title + "create" confirmation
     val isUploading: Boolean = false,         // saving audio + getting the code from the server
     val canRetry: Boolean = false,            // a recording is staged but the upload failed
     val previewReady: Boolean = false,        // server returned a code → WaveCode is shown
@@ -85,6 +86,7 @@ class WaveCodeTattooCreateViewModel : ViewModel() {
             _uiState.update {
                 it.copy(
                     isRecording = true,
+                    recorded = false,
                     error = null,
                     imageFeedback = null,
                     previewReady = false,
@@ -98,18 +100,42 @@ class WaveCodeTattooCreateViewModel : ViewModel() {
         }
     }
 
-    /** Stops recording, then immediately uploads the audio so the server can generate the code. */
+    /** Current mic peak level (0..32767) for the live recording meter; 0 when not recording. */
+    fun currentAmplitude(): Int = recorder?.maxAmplitude() ?: 0
+
+    /**
+     * Stops recording and stages the audio for review. Upload is deferred until the user confirms
+     * with a title (see [createCode]) — so the title is entered AFTER recording, not before.
+     */
     fun stopRecording(context: Context) {
         val file = recorder?.stop()
         recorder = null
         if (file == null) {
-            _uiState.update { it.copy(isRecording = false, error = "Kayıt başarısız oldu, tekrar deneyin.") }
+            _uiState.update { it.copy(isRecording = false, recorded = false, error = "Kayıt başarısız oldu, tekrar deneyin.") }
             return
         }
         stagedFile = file
-        _uiState.update { it.copy(isRecording = false) }
-        uploadStaged(context)
+        _uiState.update { it.copy(isRecording = false, recorded = true, error = null) }
     }
+
+    /** Aborts an in-progress recording and discards the partial file. */
+    fun cancelRecording() {
+        try { recorder?.cancel() } catch (_: Exception) {}
+        recorder = null
+        stagedFile?.delete()
+        stagedFile = null
+        _uiState.update { it.copy(isRecording = false, recorded = false, error = null) }
+    }
+
+    /** Discards the staged recording so the user can record again. */
+    fun reRecord() {
+        stagedFile?.delete()
+        stagedFile = null
+        _uiState.update { it.copy(recorded = false, error = null, canRetry = false) }
+    }
+
+    /** Confirms the staged recording: uploads it with the entered title to generate the code. */
+    fun createCode(context: Context) = uploadStaged(context)
 
     /** Retries the upload of the already-recorded audio after a failure. */
     fun retryUpload(context: Context) {

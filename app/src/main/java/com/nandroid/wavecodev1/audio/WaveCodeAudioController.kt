@@ -92,6 +92,15 @@ class WaveCodeAudioController {
         }
     }
 
+    /** Current playback position in ms (0 when not prepared). */
+    fun positionMs(): Long = player?.currentPosition?.coerceAtLeast(0L) ?: 0L
+
+    /** Track duration in ms, or 0 when still unknown (live/unprepared). */
+    fun durationMs(): Long = player?.duration?.takeIf { it > 0 } ?: 0L
+
+    /** Seeks to [ms] (clamped to ≥ 0). No-op if no player. */
+    fun seekTo(ms: Long) { player?.seekTo(ms.coerceAtLeast(0L)) }
+
     fun stop() {
         player?.let {
             it.stop()

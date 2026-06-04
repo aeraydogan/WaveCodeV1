@@ -4,12 +4,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +31,7 @@ import com.nandroid.wavecodev1.ui.components.TonalButton
 import com.nandroid.wavecodev1.ui.components.WaveCodeTopBar
 import com.nandroid.wavecodev1.ui.theme.WaveCodeColors
 import com.nandroid.wavecodev1.ui.theme.WaveCodeIcons
+import com.nandroid.wavecodev1.util.formatDuration
 
 @Composable
 fun ScanListenScreen(
@@ -124,10 +129,13 @@ fun ScanListenScreen(
             if (uiState.resolved) {
                 NowPlayingCard(
                     title = uiState.title,
-                    duration = uiState.durationLabel,
+                    positionMs = uiState.positionMs,
+                    totalMs = uiState.totalMs,
                     isPlaying = uiState.isPlaying,
                     isBuffering = uiState.isBuffering,
-                    onToggle = vm::togglePlayPause
+                    onToggle = vm::togglePlayPause,
+                    onSeek = vm::seekToFraction,
+                    onReplay = vm::replay
                 )
             }
         }
@@ -137,11 +145,17 @@ fun ScanListenScreen(
 @Composable
 private fun NowPlayingCard(
     title: String?,
-    duration: String?,
+    positionMs: Long,
+    totalMs: Long,
     isPlaying: Boolean,
     isBuffering: Boolean,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    onSeek: (Float) -> Unit,
+    onReplay: () -> Unit
 ) {
+    val hasDuration = totalMs > 0
+    val fraction = if (hasDuration) (positionMs.toFloat() / totalMs).coerceIn(0f, 1f) else 0f
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -157,18 +171,55 @@ private fun NowPlayingCard(
                     text = title?.takeIf { it.isNotBlank() } ?: "Ses kaydı",
                     color = WaveCodeColors.TextPrimary, fontSize = 17.sp
                 )
-                duration?.let { Text(it, color = WaveCodeColors.TextSecondary, fontSize = 13.sp, fontFamily = FontFamily.Monospace) }
             }
             Equalizer(active = isPlaying)
         }
-        PrimaryButton(
-            text = when { isBuffering -> "Yükleniyor…"; isPlaying -> "Duraklat"; else -> "Oynat" },
-            onClick = onToggle,
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = if (isBuffering) null else WaveCodeIcons.Play,
-            loading = isBuffering,
-            height = 52
+
+        // Scrubber: progress + seek
+        Slider(
+            value = fraction,
+            onValueChange = onSeek,
+            enabled = hasDuration,
+            colors = SliderDefaults.colors(
+                thumbColor = WaveCodeColors.Accent,
+                activeTrackColor = WaveCodeColors.Accent,
+                inactiveTrackColor = WaveCodeColors.Surface3,
+                disabledThumbColor = WaveCodeColors.TextMuted,
+                disabledActiveTrackColor = WaveCodeColors.Surface3,
+                disabledInactiveTrackColor = WaveCodeColors.Surface3
+            ),
+            modifier = Modifier.fillMaxWidth()
         )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(formatDuration(positionMs) ?: "0:00", color = WaveCodeColors.TextSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            Text(formatDuration(totalMs) ?: "0:00", color = WaveCodeColors.TextSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+        }
+
+        // Controls: replay + play/pause
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(WaveCodeColors.Surface3)
+                    .clickable(onClick = onReplay),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(WaveCodeIcons.Replay, contentDescription = "Baştan oynat", tint = WaveCodeColors.TextPrimary, modifier = Modifier.size(22.dp))
+            }
+            PrimaryButton(
+                text = when { isBuffering -> "Yükleniyor…"; isPlaying -> "Duraklat"; else -> "Oynat" },
+                onClick = onToggle,
+                modifier = Modifier.weight(1f),
+                leadingIcon = if (isBuffering) null else WaveCodeIcons.Play,
+                loading = isBuffering,
+                height = 52
+            )
+        }
     }
 }
 

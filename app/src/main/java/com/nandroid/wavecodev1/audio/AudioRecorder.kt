@@ -21,6 +21,12 @@ class AudioRecorder(private val context: Context) {
 
     val isRecording: Boolean get() = recorder != null
 
+    /**
+     * Peak amplitude (0..32767) captured since the previous call, or 0 when not recording.
+     * Used to drive the live recording level meter. Safe to poll from the UI.
+     */
+    fun maxAmplitude(): Int = try { recorder?.maxAmplitude ?: 0 } catch (_: Exception) { 0 }
+
     /** Begins recording into [output]. Returns false if setup fails. */
     fun start(output: File): Boolean {
         if (recorder != null) {

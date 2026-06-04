@@ -13,10 +13,13 @@ import com.nandroid.wavecodev1.util.formatDuration
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeDecodeResult
 import com.nandroid.wavecodev1.wavecode.decode.WaveCodeDecoder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -31,6 +34,8 @@ data class ScanListenUiState(
     val resolved: Boolean = false,
     val title: String? = null,
     val durationLabel: String? = null,
+    val positionMs: Long = 0,                 // live playback position (scrubber)
+    val totalMs: Long = 0,                    // track length for the scrubber
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false
 )
@@ -51,6 +56,23 @@ class ScanListenViewModel : ViewModel() {
         onPlayingChanged   = { playing -> _uiState.update { it.copy(isPlaying = playing) } }
         onBufferingChanged = { buffering -> _uiState.update { it.copy(isBuffering = buffering) } }
         onError            = { msg -> _uiState.update { it.copy(isPlaying = false, isBuffering = false, resolveError = msg) } }
+    }
+
+    private var progressJob: Job? = null
+
+    /** Polls playback position while a track is loaded so the scrubber stays in sync. */
+    private fun startProgressUpdates() {
+        progressJob?.cancel()
+        progressJob = viewModelScope.launch {
+            while (isActive) {
+                val pos = audio.positionMs()
+                val durPlayer = audio.durationMs()
+                _uiState.update {
+                    it.copy(positionMs = pos, totalMs = if (durPlayer > 0) durPlayer else it.totalMs)
+                }
+                delay(300)
+            }
+        }
     }
 
     /** Loads + decodes the picked image, then resolves and plays on success. */
@@ -101,10 +123,13 @@ class ScanListenViewModel : ViewModel() {
                             resolved = true,
                             title = meta.title,
                             durationLabel = formatDuration(meta.durationMs),
+                            positionMs = 0,
+                            totalMs = meta.durationMs ?: 0,
                             resolveError = null
                         )
                     }
                     audio.prepareAndPlay(appContext, meta)
+                    startProgressUpdates()
                 }
                 is WaveCodeNetworkResult.Failure -> {
                     Log.w(TAG, "resolve failure: kind=${result.kind} http=${result.httpCode}")
@@ -116,13 +141,31 @@ class ScanListenViewModel : ViewModel() {
 
     fun togglePlayPause() = audio.togglePlayPause()
 
+    /** Scrubs to [fraction] (0..1) of the track. */
+    fun seekToFraction(fraction: Float) {
+        val total = _uiState.value.totalMs
+        if (total <= 0) return
+        val target = (fraction.coerceIn(0f, 1f) * total).toLong()
+        audio.seekTo(target)
+        _uiState.update { it.copy(positionMs = target) }
+    }
+
+    /** Restarts the track from the beginning and resumes playback. */
+    fun replay() {
+        audio.seekTo(0)
+        _uiState.update { it.copy(positionMs = 0) }
+        if (!_uiState.value.isPlaying) audio.togglePlayPause()
+    }
+
     /** Clears the current result so the user can scan another image. */
     fun reset() {
+        progressJob?.cancel()
         audio.stop()
         _uiState.value = ScanListenUiState()
     }
 
     override fun onCleared() {
+        progressJob?.cancel()
         audio.release()
     }
 }
