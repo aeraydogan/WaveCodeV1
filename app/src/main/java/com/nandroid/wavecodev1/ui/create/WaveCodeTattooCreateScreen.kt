@@ -12,6 +12,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -25,13 +27,19 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nandroid.wavecodev1.ui.theme.rememberReducedMotion
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nandroid.wavecodev1.ui.components.OutlineButton
@@ -246,6 +254,7 @@ fun WaveCodeTattooCreateScreen(
 /** Idle state — the record button is the focal hero. */
 @Composable
 private fun IdleHero(onStart: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -258,7 +267,10 @@ private fun IdleHero(onStart: () -> Unit) {
                 .size(132.dp)
                 .clip(CircleShape)
                 .background(WaveCodeColors.Accent)
-                .clickable(onClick = onStart),
+                .clickable(onClickLabel = "Ses kaydet", role = Role.Button) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onStart()
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(WaveCodeIcons.Mic, contentDescription = "Ses kaydet", tint = WaveCodeColors.OnAccent, modifier = Modifier.size(48.dp))
@@ -300,11 +312,14 @@ private fun RecordingHero(
     val totalSec = (elapsedMs / 1000).toInt()
     val timeLabel = "%d:%02d".format(totalSec / 60, totalSec % 60)
 
+    val haptic = LocalHapticFeedback.current
+    val reducedMotion = rememberReducedMotion()
     val pulse = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by pulse.animateFloat(
+    val animatedPulse by pulse.animateFloat(
         initialValue = 1f, targetValue = 1.18f,
         animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "scale"
     )
+    val pulseScale = if (reducedMotion) 1f else animatedPulse
 
     Column(
         modifier = Modifier
@@ -343,7 +358,11 @@ private fun RecordingHero(
                     .size(96.dp)
                     .clip(CircleShape)
                     .background(WaveCodeColors.Recording)
-                    .clickable(onClick = onStop),
+                    .clickable(onClickLabel = "Kaydı durdur", role = Role.Button) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onStop()
+                    }
+                    .semantics { contentDescription = "Kaydı durdur" },
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -461,6 +480,7 @@ private fun SegmentedTabs(selectedSkin: Boolean, onSelect: (Boolean) -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(WaveCodeColors.Surface1)
+            .selectableGroup()
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -475,7 +495,7 @@ private fun SegOption(text: String, active: Boolean, modifier: Modifier = Modifi
         modifier = modifier
             .clip(RoundedCornerShape(11.dp))
             .background(if (active) WaveCodeColors.Surface3 else Color.Transparent)
-            .clickable(onClick = onClick)
+            .selectable(selected = active, role = Role.Tab, onClick = onClick)
             .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -490,6 +510,7 @@ private fun SegOption(text: String, active: Boolean, modifier: Modifier = Modifi
 @Composable
 private fun CodeCard(code: String) {
     val clipboard = LocalClipboardManager.current
+    val haptic = LocalHapticFeedback.current
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) {
         if (copied) { delay(1500); copied = false }
@@ -523,7 +544,11 @@ private fun CodeCard(code: String) {
         }
         TonalButton(
             text = if (copied) "Kopyalandı" else "Kopyala",
-            onClick = { clipboard.setText(AnnotatedString(code)); copied = true },
+            onClick = {
+                clipboard.setText(AnnotatedString(code))
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                copied = true
+            },
             modifier = Modifier.fillMaxWidth(),
             leadingIcon = if (copied) WaveCodeIcons.Check else WaveCodeIcons.Copy,
             height = 48

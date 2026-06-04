@@ -16,7 +16,7 @@ object WaveCodeColors {
 
     val TextPrimary   = Color(0xFFECECEC)
     val TextSecondary = Color(0xFFA0A0A6)
-    val TextMuted     = Color(0xFF6E6E76)
+    val TextMuted     = Color(0xFF8A8A92)   // AA (~5.4:1 on Canvas) — lifted from #6E6E76 for readability
 
     val Accent        = Color(0xFFC8FF3D)   // Electric Lime
     val OnAccent      = Color(0xFF0A0A0A)

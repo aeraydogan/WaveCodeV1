@@ -31,6 +31,7 @@ import com.nandroid.wavecodev1.ui.components.TonalButton
 import com.nandroid.wavecodev1.ui.components.WaveCodeTopBar
 import com.nandroid.wavecodev1.ui.theme.WaveCodeColors
 import com.nandroid.wavecodev1.ui.theme.WaveCodeIcons
+import com.nandroid.wavecodev1.ui.theme.rememberReducedMotion
 import com.nandroid.wavecodev1.util.formatDuration
 
 @Composable
@@ -225,6 +226,8 @@ private fun NowPlayingCard(
 
 @Composable
 private fun Equalizer(active: Boolean) {
+    // Decorative motion — hold the bars static when the user has reduced motion enabled.
+    val animate = active && !rememberReducedMotion()
     val t = rememberInfiniteTransition(label = "eq")
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -242,7 +245,7 @@ private fun Equalizer(active: Boolean) {
             Box(
                 modifier = Modifier
                     .width(5.dp)
-                    .fillMaxHeight(if (active) h else 0.25f)
+                    .fillMaxHeight(if (animate) h else 0.25f)
                     .clip(RoundedCornerShape(3.dp))
                     .background(WaveCodeColors.Accent)
             )
