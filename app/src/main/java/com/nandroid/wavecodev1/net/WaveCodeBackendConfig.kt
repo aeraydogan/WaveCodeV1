@@ -14,7 +14,7 @@ package com.nandroid.wavecodev1.net
 object WaveCodeBackendConfig {
 
     /** Change this to repoint the whole app. No trailing slash. */
-    const val BASE_URL = "http://192.168.1.8:3000"
+    const val BASE_URL = "https://wavecode-backend-production.up.railway.app"
 
     /** Health probe — `GET /health` → `{ "status": "ok" }`. */
     const val HEALTH_URL = "$BASE_URL/health"
